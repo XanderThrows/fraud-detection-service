@@ -7,6 +7,9 @@ A comprehensive fraud detection microservice designed for banking applications, 
 ### Human-Intent Detection (Implemented)
 Analyzes user behavior patterns like typing speed, mouse movements, and hesitation to determine whether an action is being performed by the legitimate user or under coercion/manipulation.
 
+### Predictive Scam Prevention (Implemented)
+Uses real-time data and AI models to identify high-risk transactions before they occur. Can automatically warn users, delay suspicious transfers, or require additional verification, preventing fraud rather than reacting after the fact.
+
 ## Getting Started
 
 ### Prerequisites
@@ -353,18 +356,234 @@ Flags provide context about which specific behaviors triggered the risk assessme
 - **High Risk (0.61-0.80):** Delay transaction and require multi-factor authentication
 - **Very High Risk (0.81-1.00):** Block transaction and flag for manual review
 
+### Predictive Scam Prevention
+
+#### POST /transactions/predict
+
+Predicts if a transaction is a scam by evaluating amount, type, location, device, timing, and recipient patterns. This endpoint analyzes transactions in real-time before they are processed, allowing for proactive fraud prevention.
+
+**Request Body:**
+```json
+{
+  "transactionId": "tx-98765",
+  "userId": "12345",
+  "amount": 5000,
+  "currency": "USD",
+  "recipientAccount": "987654321",
+  "userAverageTransAmount": 200,
+  "transactionType": "wire_transfer",
+  "location": "New York, USA",
+  "timestamp": "2025-11-19T17:30:00Z",
+  "deviceId": "device-456"
+}
+```
+
+**Response:**
+```json
+{
+  "transactionId": "tx-98765",
+  "predictionResult": "SUSPICIOUS",
+  "riskScore": 0.92,
+  "recommendedAction": "DELAY_AND_MFA",
+  "reasonCodes": ["HIGH_AMOUNT", "NEW_DEVICE", "HIGH_RISK_TRANSACTION_TYPE"]
+}
+```
+
+**Response Codes:**
+- `200 OK`: Analysis completed successfully
+- `400 Bad Request`: Invalid request data
+- `500 Internal Server Error`: Server error during analysis
+
+**Field Descriptions:**
+- `transactionId` (string, required): Unique identifier for the transaction
+- `userId` (string, required): Unique identifier for the user
+- `amount` (number, required): Transaction amount
+- `currency` (string, required): Currency code (e.g., "USD", "EUR")
+- `recipientAccount` (string, required): Recipient account identifier
+- `userAverageTransAmount` (number, required): User's average transaction amount for comparison
+- `transactionType` (string, required): Type of transaction (e.g., "wire_transfer", "payment", "transfer")
+- `location` (string, required): Transaction location or destination
+- `timestamp` (string, required): Transaction timestamp in ISO 8601 format
+- `deviceId` (string, required): Device identifier used for the transaction
+
+**Prediction Results:**
+- `SAFE`: Low risk transaction, can proceed normally
+- `SUSPICIOUS`: Medium risk, requires review or additional verification
+- `HIGH_RISK`: High risk transaction, should be delayed or blocked
+
+**Recommended Actions:**
+- `APPROVE`: Transaction is safe to proceed
+- `FLAG_FOR_REVIEW`: Transaction should be reviewed by fraud team
+- `DELAY_AND_MFA`: Delay transaction and require multi-factor authentication
+- `BLOCK`: Block transaction immediately
+
+**Reason Codes:**
+Possible reason codes include:
+- `HIGH_AMOUNT`: Transaction amount is significantly higher than user's average
+- `VERY_HIGH_AMOUNT`: Transaction amount is extremely high (10x+ average)
+- `HIGH_RISK_TRANSACTION_TYPE`: Transaction type is inherently risky (wire transfer, international, etc.)
+- `HIGH_RISK_LOCATION`: Transaction destination is in a high-risk location
+- `NEW_DEVICE`: Transaction is from a device not previously used by the user
+- `NEW_RECIPIENT`: Recipient account has not been used by this user before
+- `UNUSUAL_TIMING`: Transaction occurs at unusual hours or times
+
+**Risk Score:**
+The `riskScore` ranges from 0.00 (low risk) to 1.00 (high risk) and is calculated based on:
+- Transaction amount relative to user average (30% weight)
+- Transaction type risk (20% weight)
+- Location risk (15% weight)
+- Device history (15% weight)
+- Transaction timing (10% weight)
+- Recipient history (10% weight)
+
+### How Predictive Scam Prevention Works
+
+The Predictive Scam Prevention module uses a multi-factor risk assessment approach to evaluate transactions before they are processed. This proactive approach helps prevent fraud rather than reacting after the fact.
+
+#### Overview
+
+The system analyzes six key factors to determine transaction risk:
+1. **Amount Analysis**: Compares transaction amount to user's historical average
+2. **Transaction Type**: Evaluates the inherent risk of the transaction type
+3. **Location Analysis**: Checks if the destination is in a high-risk location
+4. **Device Analysis**: Verifies if the device has been used by the user before
+5. **Timing Analysis**: Detects unusual transaction times
+6. **Recipient Analysis**: Checks if the recipient is known to the user
+
+#### Risk Factors
+
+##### 1. Amount Analysis (30% weight)
+
+**Purpose:** Detects transactions that are significantly larger than the user's typical transaction size.
+
+**How it works:**
+- Compares transaction amount to `userAverageTransAmount`
+- **Very High Risk (10x+ average):** Risk score 0.95
+- **High Risk (5x-10x average):** Risk score 0.8
+- **Medium Risk (3x-5x average):** Risk score 0.5
+- **Low-Medium Risk (2x-3x average):** Risk score 0.3
+
+**Example:**
+- User average: $200
+- Transaction: $5,000 (25x average) → Very high risk
+- Transaction: $1,000 (5x average) → High risk
+
+##### 2. Transaction Type Analysis (20% weight)
+
+**Purpose:** Identifies inherently risky transaction types.
+
+**High-Risk Types:**
+- Wire transfers
+- International transfers
+- Cryptocurrency transactions
+- Money orders
+- Cash advances
+
+**Risk Scoring:**
+- High-risk types: 0.7 risk score
+- Medium-risk types (transfers, payments): 0.3 risk score
+- Standard transactions: 0.0 risk score
+
+##### 3. Location Analysis (15% weight)
+
+**Purpose:** Detects transactions to high-risk locations.
+
+**High-Risk Locations:**
+- Offshore locations
+- Tax havens
+- Sanctioned countries
+- International/foreign destinations (medium risk)
+
+**Risk Scoring:**
+- High-risk locations: 0.8 risk score
+- International locations: 0.4 risk score
+- Standard locations: 0.0 risk score
+
+##### 4. Device Analysis (15% weight)
+
+**Purpose:** Identifies transactions from new or unknown devices.
+
+**How it works:**
+- Checks if device has been used by the user before
+- New devices are more likely to be fraudulent
+- In production, this would query a device history database
+
+**Risk Scoring:**
+- New device: 0.7 risk score
+- Known device: 0.0 risk score
+
+##### 5. Timing Analysis (10% weight)
+
+**Purpose:** Detects transactions at unusual times.
+
+**How it works:**
+- Analyzes transaction timestamp
+- Transactions outside business hours (2 AM - 6 AM UTC) are more suspicious
+- Very late night transactions (11 PM - 2 AM) are slightly suspicious
+- In production, would compare to user's typical transaction times
+
+**Risk Scoring:**
+- Unusual hours (2-6 AM): 0.5 risk score
+- Late night (11 PM-2 AM): 0.3 risk score
+- Normal hours: 0.0 risk score
+
+##### 6. Recipient Analysis (10% weight)
+
+**Purpose:** Identifies transactions to new or suspicious recipients.
+
+**How it works:**
+- Checks if recipient has been used by the user before
+- Suspicious recipient patterns (temp accounts, test accounts) are flagged
+- In production, would query recipient history database
+
+**Risk Scoring:**
+- Suspicious recipient: 0.7 risk score
+- New recipient: 0.6 risk score
+- Known recipient: 0.0 risk score
+
+#### Action Determination
+
+The system determines the recommended action based on risk score and reason codes:
+
+- **BLOCK** (Risk ≥ 0.9 or Risk ≥ 0.8 with critical flags):
+  - Very high risk transactions
+  - High risk with very high amount or high-risk location
+
+- **DELAY_AND_MFA** (Risk ≥ 0.7 or Risk ≥ 0.6 with high-risk factors):
+  - High risk transactions
+  - Medium-high risk with high amount, new device, or high-risk transaction type
+
+- **FLAG_FOR_REVIEW** (Risk ≥ 0.4 or multiple reason codes):
+  - Suspicious transactions
+  - Multiple risk factors present
+
+- **APPROVE** (Risk < 0.4):
+  - Low risk transactions
+  - Normal transaction patterns
+
+#### Integration Recommendations
+
+- **APPROVE**: Process transaction immediately
+- **FLAG_FOR_REVIEW**: Queue for manual review, allow user to proceed with warning
+- **DELAY_AND_MFA**: Hold transaction, require additional authentication (SMS, email, security questions)
+- **BLOCK**: Reject transaction, notify user and fraud team
+
 ## Project Structure
 
 ```
 fraud-detection-service/
 ├── src/
 │   ├── modules/
-│   │   └── human-intent-detection/
-│   │       └── behaviorAnalyzer.ts
+│   │   ├── human-intent-detection/
+│   │   │   └── behaviorAnalyzer.ts
+│   │   └── predictive-scam-prevention/
+│   │       └── transactionAnalyzer.ts
 │   ├── routes/
-│   │   └── behavior.routes.ts
+│   │   ├── behavior.routes.ts
+│   │   └── transaction.routes.ts
 │   ├── types/
-│   │   └── behavior.ts
+│   │   ├── behavior.ts
+│   │   └── transaction.ts
 │   └── index.ts
 ├── dist/                 # Compiled JavaScript (generated)
 ├── package.json
@@ -397,7 +616,6 @@ NODE_ENV=development
 
 ## Future Modules
 
-- **Predictive Scam Prevention**: Real-time transaction risk assessment
 - **Cross-Banking Fraud Sharing**: Anonymized fraud intelligence sharing between banks
 
 ## License

@@ -2,6 +2,7 @@ import express, { Express } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import behaviorRoutes from './routes/behavior.routes';
+import transactionRoutes from './routes/transaction.routes';
 
 // Load environment variables
 dotenv.config();
@@ -50,6 +51,30 @@ app.get('/getAll', (req, res) => {
           behaviorFlags: 'string[]',
         },
       },
+      {
+        method: 'POST',
+        path: '/transactions/predict',
+        description: 'Predicts if a transaction is a scam by evaluating amount, type, location, etc.',
+        requestBody: {
+          transactionId: 'string (required)',
+          userId: 'string (required)',
+          amount: 'number (required)',
+          currency: 'string (required)',
+          recipientAccount: 'string (required)',
+          userAverageTransAmount: 'number (required)',
+          transactionType: 'string (required)',
+          location: 'string (required)',
+          timestamp: 'string (required) - ISO 8601 format',
+          deviceId: 'string (required)',
+        },
+        response: {
+          transactionId: 'string',
+          predictionResult: 'SAFE | SUSPICIOUS | HIGH_RISK',
+          riskScore: 'number (0.00-1.00)',
+          recommendedAction: 'APPROVE | FLAG_FOR_REVIEW | DELAY_AND_MFA | BLOCK',
+          reasonCodes: 'string[]',
+        },
+      },
     ],
     timestamp: new Date().toISOString(),
   });
@@ -66,6 +91,7 @@ app.get('/health', (req, res) => {
 
 // Routes
 app.use('/behavior', behaviorRoutes);
+app.use('/transactions', transactionRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -90,6 +116,7 @@ app.listen(PORT, () => {
   console.log(`📋 API documentation: http://localhost:${PORT}/getAll`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`🔍 Behavior analysis: http://localhost:${PORT}/behavior/analyze`);
+  console.log(`💰 Transaction prediction: http://localhost:${PORT}/transactions/predict`);
 });
 
 export default app;
