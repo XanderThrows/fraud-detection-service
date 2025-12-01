@@ -10,6 +10,9 @@ Analyzes user behavior patterns like typing speed, mouse movements, and hesitati
 ### Predictive Scam Prevention (Implemented)
 Uses real-time data and AI models to identify high-risk transactions before they occur. Can automatically warn users, delay suspicious transfers, or require additional verification, preventing fraud rather than reacting after the fact.
 
+### Cross-Banking Fraud Sharing (Implemented)
+Allows multiple banks to share anonymized fraud intelligence like known fraudster devices, accounts, or transaction patterns without exposing personal customer data. Helps detect fraud schemes that span multiple institutions.
+
 ## Getting Started
 
 ### Prerequisites
@@ -568,6 +571,169 @@ The system determines the recommended action based on risk score and reason code
 - **DELAY_AND_MFA**: Hold transaction, require additional authentication (SMS, email, security questions)
 - **BLOCK**: Reject transaction, notify user and fraud team
 
+### Cross-Banking Fraud Sharing
+
+#### POST /fraud/submit
+
+Submits new fraud data to the shared database. Banks can contribute anonymized fraud intelligence without exposing personal customer data.
+
+**Request Body:**
+```json
+{
+  "bankId": "BankA",
+  "deviceIdHash": "devicehash456",
+  "accountIdHash": "accounthash789",
+  "transactionPatternHash": "patternhash123",
+  "fraudType": "account_takeover",
+  "timestamp": "2025-11-19T17:30:00Z",
+  "severity": "high"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Fraud data submitted successfully",
+  "fraudId": "fraud-1734652800000-abc123xyz"
+}
+```
+
+**Response Codes:**
+- `201 Created`: Fraud data submitted successfully
+- `400 Bad Request`: Invalid request data or missing required fields
+- `500 Internal Server Error`: Server error during submission
+
+**Field Descriptions:**
+- `bankId` (string, required): Identifier for the bank submitting the fraud data
+- `deviceIdHash` (string, required): Hashed device identifier (anonymized)
+- `accountIdHash` (string, required): Hashed account identifier (anonymized)
+- `transactionPatternHash` (string, required): Hashed transaction pattern (anonymized)
+- `fraudType` (string, required): Type of fraud detected (e.g., "account_takeover", "phishing", "card_fraud")
+- `timestamp` (string, required): When the fraud occurred (ISO 8601 format)
+- `severity` (string, required): Severity level - one of: "low", "medium", "high", "critical"
+
+#### POST /fraud/query
+
+Checks if a device, account, or transaction pattern is already associated with fraudulent activity across all participating banks.
+
+**Request Body:**
+```json
+{
+  "deviceIdHash": "devicehash456",
+  "accountIdHash": "accounthash789",
+  "transactionPatternHash": "patternhash123"
+}
+```
+
+**Note:** At least one of the hash fields must be provided.
+
+**Response:**
+```json
+{
+  "found": true,
+  "matches": {
+    "deviceIdHash": true,
+    "accountIdHash": false,
+    "transactionPatternHash": true
+  },
+  "fraudRecords": [
+    {
+      "fraudId": "fraud-1734652800000-abc123xyz",
+      "bankId": "BankA",
+      "deviceIdHash": "devicehash456",
+      "accountIdHash": "accounthash789",
+      "transactionPatternHash": "patternhash123",
+      "fraudType": "account_takeover",
+      "timestamp": "2025-11-19T17:30:00Z",
+      "severity": "high",
+      "submittedAt": "2025-11-19T18:00:00Z"
+    }
+  ]
+}
+```
+
+**Response Codes:**
+- `200 OK`: Query completed successfully
+- `400 Bad Request`: No hash fields provided
+- `500 Internal Server Error`: Server error during query
+
+**Response Fields:**
+- `found` (boolean): Whether any matches were found
+- `matches` (object): Indicates which hash fields matched
+- `fraudRecords` (array, optional): Array of matching fraud records (only present if found is true)
+
+#### GET /fraud/analytics
+
+Returns fraud analytics and statistics from the shared fraud database.
+
+**Response:**
+```json
+{
+  "lastAttemptedFraud": "11/22/2025",
+  "mostCommonFraud": "account_takeover",
+  "lastFraudulentDeviceID": "devicehash456",
+  "totalFraudRecords": 150,
+  "fraudByType": {
+    "account_takeover": 45,
+    "phishing": 30,
+    "card_fraud": 25,
+    "identity_theft": 20,
+    "money_laundering": 15,
+    "other": 15
+  },
+  "fraudBySeverity": {
+    "critical": 10,
+    "high": 50,
+    "medium": 60,
+    "low": 30
+  }
+}
+```
+
+**Response Codes:**
+- `200 OK`: Analytics retrieved successfully
+- `500 Internal Server Error`: Server error during retrieval
+
+**Response Fields:**
+- `lastAttemptedFraud` (string): Date of the most recent fraud attempt (MM/DD/YYYY format)
+- `mostCommonFraud` (string): Most frequently reported fraud type
+- `lastFraudulentDeviceID` (string): Device ID hash from the most recent fraud record
+- `totalFraudRecords` (number, optional): Total number of fraud records in the database
+- `fraudByType` (object, optional): Count of fraud records by type
+- `fraudBySeverity` (object, optional): Count of fraud records by severity level
+
+### How Cross-Banking Fraud Sharing Works
+
+The Cross-Banking Fraud Sharing module enables banks to collaborate in fraud prevention by sharing anonymized intelligence without exposing customer data.
+
+#### Overview
+
+The system uses hashed identifiers to maintain privacy while allowing banks to:
+1. **Submit Fraud Data**: Share anonymized fraud intelligence
+2. **Query Fraud Database**: Check if devices, accounts, or patterns are known fraud indicators
+3. **View Analytics**: Get insights into fraud trends across all participating banks
+
+#### Privacy and Anonymization
+
+- **Hashed Identifiers**: All sensitive data (devices, accounts, patterns) are hashed before storage
+- **No Personal Data**: Only anonymized hashes are shared, never actual customer information
+- **Bank Identification**: Banks are identified by ID, but customer data remains private
+
+#### Use Cases
+
+1. **Multi-Bank Fraud Detection**: Detect fraud schemes that span multiple institutions
+2. **Early Warning System**: Get alerts when known fraud indicators appear
+3. **Pattern Recognition**: Identify fraud patterns that affect multiple banks
+4. **Collaborative Defense**: Strengthen fraud prevention through shared intelligence
+
+#### Integration Recommendations
+
+- **Before Processing Transactions**: Query the fraud database to check for known fraud indicators
+- **After Detecting Fraud**: Submit fraud data to help other banks prevent similar attacks
+- **Regular Monitoring**: Use analytics to understand fraud trends and adjust prevention strategies
+- **Real-time Alerts**: Integrate query results into transaction processing workflows
+
 ## Project Structure
 
 ```
@@ -576,14 +742,18 @@ fraud-detection-service/
 │   ├── modules/
 │   │   ├── human-intent-detection/
 │   │   │   └── behaviorAnalyzer.ts
-│   │   └── predictive-scam-prevention/
-│   │       └── transactionAnalyzer.ts
+│   │   ├── predictive-scam-prevention/
+│   │   │   └── transactionAnalyzer.ts
+│   │   └── cross-banking-fraud-sharing/
+│   │       └── fraudService.ts
 │   ├── routes/
 │   │   ├── behavior.routes.ts
-│   │   └── transaction.routes.ts
+│   │   ├── transaction.routes.ts
+│   │   └── fraud.routes.ts
 │   ├── types/
 │   │   ├── behavior.ts
-│   │   └── transaction.ts
+│   │   ├── transaction.ts
+│   │   └── fraud.ts
 │   └── index.ts
 ├── dist/                 # Compiled JavaScript (generated)
 ├── package.json
@@ -614,9 +784,12 @@ PORT=3000
 NODE_ENV=development
 ```
 
-## Future Modules
+## Future Enhancements
 
-- **Cross-Banking Fraud Sharing**: Anonymized fraud intelligence sharing between banks
+- Database integration for persistent fraud data storage
+- Real-time fraud alerts and notifications
+- Machine learning models for fraud pattern detection
+- Advanced analytics and reporting dashboards
 
 ## License
 

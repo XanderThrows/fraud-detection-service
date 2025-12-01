@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import behaviorRoutes from './routes/behavior.routes';
 import transactionRoutes from './routes/transaction.routes';
+import fraudRoutes from './routes/fraud.routes';
 
 // Load environment variables
 dotenv.config();
@@ -75,6 +76,57 @@ app.get('/getAll', (req, res) => {
           reasonCodes: 'string[]',
         },
       },
+      {
+        method: 'POST',
+        path: '/fraud/submit',
+        description: 'Submits new fraud data to the shared database',
+        requestBody: {
+          bankId: 'string (required)',
+          deviceIdHash: 'string (required)',
+          accountIdHash: 'string (required)',
+          transactionPatternHash: 'string (required)',
+          fraudType: 'string (required)',
+          timestamp: 'string (required) - ISO 8601 format',
+          severity: 'low | medium | high | critical (required)',
+        },
+        response: {
+          success: 'boolean',
+          message: 'string',
+          fraudId: 'string (optional)',
+        },
+      },
+      {
+        method: 'POST',
+        path: '/fraud/query',
+        description: 'Checks if device, account, or transaction pattern is associated with fraud',
+        requestBody: {
+          deviceIdHash: 'string (optional)',
+          accountIdHash: 'string (optional)',
+          transactionPatternHash: 'string (optional)',
+        },
+        response: {
+          found: 'boolean',
+          matches: {
+            deviceIdHash: 'boolean',
+            accountIdHash: 'boolean',
+            transactionPatternHash: 'boolean',
+          },
+          fraudRecords: 'FraudRecord[] (optional)',
+        },
+      },
+      {
+        method: 'GET',
+        path: '/fraud/analytics',
+        description: 'Returns fraud analytics and statistics',
+        response: {
+          lastAttemptedFraud: 'string',
+          mostCommonFraud: 'string',
+          lastFraudulentDeviceID: 'string',
+          totalFraudRecords: 'number (optional)',
+          fraudByType: 'Record<string, number> (optional)',
+          fraudBySeverity: 'Record<string, number> (optional)',
+        },
+      },
     ],
     timestamp: new Date().toISOString(),
   });
@@ -92,6 +144,7 @@ app.get('/health', (req, res) => {
 // Routes
 app.use('/behavior', behaviorRoutes);
 app.use('/transactions', transactionRoutes);
+app.use('/fraud', fraudRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -117,6 +170,9 @@ app.listen(PORT, () => {
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`🔍 Behavior analysis: http://localhost:${PORT}/behavior/analyze`);
   console.log(`💰 Transaction prediction: http://localhost:${PORT}/transactions/predict`);
+  console.log(`🏦 Fraud sharing: http://localhost:${PORT}/fraud/submit`);
+  console.log(`🔎 Fraud query: http://localhost:${PORT}/fraud/query`);
+  console.log(`📈 Fraud analytics: http://localhost:${PORT}/fraud/analytics`);
 });
 
 export default app;
