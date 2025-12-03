@@ -4,13 +4,13 @@ A comprehensive fraud detection microservice designed for banking applications, 
 
 ## Features
 
-### Human-Intent Detection (Implemented)
+### Human-Intent Detection
 Analyzes user behavior patterns like typing speed, mouse movements, and hesitation to determine whether an action is being performed by the legitimate user or under coercion/manipulation.
 
-### Predictive Scam Prevention (Implemented)
+### Predictive Scam Prevention
 Uses real-time data and AI models to identify high-risk transactions before they occur. Can automatically warn users, delay suspicious transfers, or require additional verification, preventing fraud rather than reacting after the fact.
 
-### Cross-Banking Fraud Sharing (Implemented)
+### Cross-Banking Fraud Sharing
 Allows multiple banks to share anonymized fraud intelligence like known fraudster devices, accounts, or transaction patterns without exposing personal customer data. Helps detect fraud schemes that span multiple institutions.
 
 ## Getting Started
