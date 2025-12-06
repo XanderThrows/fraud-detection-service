@@ -750,14 +750,21 @@ fraud-detection-service/
 │   │   ├── behavior.routes.ts
 │   │   ├── transaction.routes.ts
 │   │   └── fraud.routes.ts
+│   ├── services/
+│   │   └── s3Service.ts
 │   ├── types/
 │   │   ├── behavior.ts
 │   │   ├── transaction.ts
 │   │   └── fraud.ts
 │   └── index.ts
+├── __tests__/
+│   └── s3-connection.test.ts
 ├── dist/                 # Compiled JavaScript (generated)
 ├── package.json
 ├── tsconfig.json
+├── jest.config.js
+├── jest.setup.js
+├── env.example
 └── README.md
 ```
 
@@ -775,6 +782,84 @@ This will start the server with auto-reload on file changes.
 npm run build
 ```
 
+## Testing
+
+The project uses [Jest](https://jestjs.io/) for testing with TypeScript support via `ts-jest`.
+
+### Running Tests
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode (automatically re-runs on file changes)
+npm run test:watch
+
+# Run tests with coverage report
+npm run test:coverage
+
+# Run a specific test file
+npm test -- s3-connection
+```
+
+### Test Structure
+
+Tests are located in the `__tests__` directory:
+
+```
+__tests__/
+└── s3-connection.test.ts    # AWS S3 connection and configuration tests
+```
+
+### Available Tests
+
+#### S3 Connection Tests (`__tests__/s3-connection.test.ts`)
+
+Tests for AWS S3 integration:
+
+- **Environment Variables Validation**: Verifies all required AWS credentials are set
+- **S3 Connection Test**: Tests connection to the configured S3 bucket
+- **Error Handling**: Tests graceful error handling for invalid credentials
+
+**Prerequisites for S3 Tests:**
+- AWS credentials must be configured in `.env` file
+- S3 bucket must exist and be accessible
+- IAM user must have appropriate S3 permissions
+
+**Required Environment Variables:**
+```env
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=your-access-key-id
+AWS_SECRET_ACCESS_KEY=your-secret-access-key
+S3_BUCKET_NAME=your-bucket-name
+```
+
+### Writing Tests
+
+To add new tests:
+
+1. Create test files in the `__tests__` directory
+2. Use the `.test.ts` or `.spec.ts` extension
+3. Follow Jest conventions:
+
+```typescript
+import { YourService } from '../src/services/yourService';
+
+describe('YourService', () => {
+  it('should do something', () => {
+    // Test implementation
+    expect(result).toBe(expected);
+  });
+});
+```
+
+### Test Configuration
+
+Jest configuration is in `jest.config.js`:
+- TypeScript support via `ts-jest`
+- Environment variables loaded via `jest.setup.js`
+- Coverage collection from `src/` directory
+
 ## Environment Variables
 
 Create a `.env` file in the root directory:
@@ -782,6 +867,18 @@ Create a `.env` file in the root directory:
 ```env
 PORT=3000
 NODE_ENV=development
+
+# AWS S3 Configuration (required for S3 tests and functionality)
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=your-access-key-id
+AWS_SECRET_ACCESS_KEY=your-secret-access-key
+S3_BUCKET_NAME=your-bucket-name
+```
+
+See `env.example` for a complete template. Copy it to `.env` and fill in your values:
+
+```bash
+cp env.example .env
 ```
 
 ## Future Enhancements
