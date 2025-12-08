@@ -11,9 +11,7 @@ export class S3Service {
   constructor() {
     this.bucketName = process.env.S3_BUCKET_NAME || 'fraud-detection-service-data';
     
-    this.s3Client = new S3Client({
-      region: process.env.AWS_REGION || 'us-east-1',
-      const credentials = process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY
+    const credentials = process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY
       ? {
           accessKeyId: process.env.AWS_ACCESS_KEY_ID,
           secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
@@ -257,7 +255,3 @@ export class S3Service {
     }
   }
 }
-
-
-
-

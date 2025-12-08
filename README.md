@@ -11,7 +11,7 @@ Analyzes user behavior patterns like typing speed, mouse movements, and hesitati
 Uses real-time data and AI models to identify high-risk transactions before they occur. Can automatically warn users, delay suspicious transfers, or require additional verification, preventing fraud rather than reacting after the fact.
 
 ### Cross-Banking Fraud Sharing
-Allows multiple banks to share anonymized fraud intelligence like known fraudster devices, accounts, or transaction patterns without exposing personal customer data. Helps detect fraud schemes that span multiple institutions.
+Allows multiple banks to share anonymized fraud intelligence like known fraudster devices, accounts, or transaction patterns without exposing personal customer data. Helps detect fraud schemes that span multiple institutions. Integrated with AWS S3 for persistent storage and centralized fraud intelligence sharing.
 
 ## Getting Started
 
@@ -734,6 +734,280 @@ The system uses hashed identifiers to maintain privacy while allowing banks to:
 - **Regular Monitoring**: Use analytics to understand fraud trends and adjust prevention strategies
 - **Real-time Alerts**: Integrate query results into transaction processing workflows
 
+## AWS S3 Bucket Integration
+
+The fraud detection service integrates with AWS S3 for persistent storage of fraud records. This enables centralized fraud intelligence sharing across multiple banks and provides durable storage for fraud data.
+
+### Overview
+
+The S3 integration automatically saves fraud records detected by the human-intent detection and predictive scam prevention modules to an S3 bucket. The cross-banking fraud sharing service reads from this bucket to provide a unified view of all fraud records across participating banks.
+
+### APIs Connected to S3 Bucket
+
+#### 1. POST /behavior/analyze
+
+**Connection Type:** Automatic Upload (Write)
+
+**When Data is Uploaded:**
+- Automatically uploads fraud records to S3 when `intentRiskScore >= 0.7` (high risk threshold)
+- Upload happens asynchronously after the analysis response is returned to the client
+- Non-blocking: API response is not delayed if S3 upload fails
+
+**How Data is Uploaded:**
+1. Behavior analysis is performed and returns an `intentRiskScore`
+2. If the score indicates fraud (≥ 0.7), the system:
+   - Converts behavior data to a standardized `FraudRecord` format
+   - Hashes sensitive data (userId, sessionId, behavior patterns) using SHA-256
+   - Determines severity level based on risk score
+   - Uploads the record to S3 at path: `fraud-records/{year}/{month}/fraud-{fraudId}.json`
+   - Sets fraud type to `'human_intent_fraud'`
+
+**Example Flow:**
+```json
+// Request to /behavior/analyze
+{
+  "userId": "user123",
+  "sessionId": "session456",
+  "typingSpeed": 120,
+  "mouseMovement": 300,
+  "clickPattern": [200, 500, 100],
+  "navigationTime": 60,
+  "pagesVisited": ["login", "transfer", "confirmation"]
+}
+
+// Response (intentRiskScore: 0.87 - triggers S3 upload)
+{
+  "sessionId": "session456",
+  "intentRiskScore": 0.87,
+  "behaviorFlags": ["typing_slow", "long_navigation_time"]
+}
+
+// Automatically uploaded to S3 as:
+// fraud-records/2025/01/fraud-1736284800000-abc123.json
+{
+  "fraudId": "fraud-1736284800000-abc123",
+  "bankId": "default-bank",
+  "deviceIdHash": "sha256_hash_of_sessionId",
+  "accountIdHash": "sha256_hash_of_userId",
+  "transactionPatternHash": "sha256_hash_of_behavior_pattern",
+  "fraudType": "human_intent_fraud",
+  "timestamp": "2025-01-07T12:00:00.000Z",
+  "severity": "critical",
+  "submittedAt": "2025-01-07T12:00:00.000Z"
+}
+```
+
+#### 2. POST /transactions/predict
+
+**Connection Type:** Automatic Upload (Write)
+
+**When Data is Uploaded:**
+- Automatically uploads fraud records to S3 when `predictionResult` is `'HIGH_RISK'` or `'SUSPICIOUS'`
+- Upload happens asynchronously after the prediction response is returned to the client
+- Non-blocking: API response is not delayed if S3 upload fails
+
+**How Data is Uploaded:**
+1. Transaction analysis is performed and returns a `predictionResult` and `riskScore`
+2. If the result indicates fraud (`HIGH_RISK` or `SUSPICIOUS`), the system:
+   - Converts transaction data to a standardized `FraudRecord` format
+   - Hashes sensitive data (deviceId, userId, transaction details) using SHA-256
+   - Determines severity level based on prediction result and risk score
+   - Uploads the record to S3 at path: `fraud-records/{year}/{month}/fraud-{fraudId}.json`
+   - Sets fraud type to `'predictive_scam'`
+
+**Example Flow:**
+```json
+// Request to /transactions/predict
+{
+  "transactionId": "txn789",
+  "userId": "user123",
+  "amount": 50000,
+  "currency": "USD",
+  "recipientAccount": "acc999",
+  "userAverageTransAmount": 500,
+  "transactionType": "wire_transfer",
+  "location": "offshore",
+  "timestamp": "2025-01-07T12:00:00.000Z",
+  "deviceId": "device-xyz"
+}
+
+// Response (HIGH_RISK - triggers S3 upload)
+{
+  "transactionId": "txn789",
+  "predictionResult": "HIGH_RISK",
+  "riskScore": 0.85,
+  "recommendedAction": "BLOCK",
+  "reasonCodes": ["VERY_HIGH_AMOUNT", "HIGH_RISK_TRANSACTION_TYPE", "HIGH_RISK_LOCATION"]
+}
+
+// Automatically uploaded to S3 as:
+// fraud-records/2025/01/fraud-1736284800000-def456.json
+{
+  "fraudId": "fraud-1736284800000-def456",
+  "bankId": "default-bank",
+  "deviceIdHash": "sha256_hash_of_deviceId",
+  "accountIdHash": "sha256_hash_of_userId",
+  "transactionPatternHash": "sha256_hash_of_transaction_pattern",
+  "fraudType": "predictive_scam",
+  "timestamp": "2025-01-07T12:00:00.000Z",
+  "severity": "critical",
+  "submittedAt": "2025-01-07T12:00:00.000Z"
+}
+```
+
+#### 3. POST /fraud/submit
+
+**Connection Type:** Manual Upload (Write)
+
+**When Data is Uploaded:**
+- Uploads fraud records to S3 when explicitly submitted via the API
+- Upload happens synchronously as part of the submission process
+- Both saves to in-memory storage and S3 bucket
+
+**How Data is Uploaded:**
+1. Client submits fraud data with required fields (bankId, hashed identifiers, fraudType, etc.)
+2. System generates a unique `fraudId`
+3. Creates a `FraudRecord` from the submitted data
+4. Saves to both in-memory storage and S3 bucket
+5. Returns success response with the generated `fraudId`
+
+#### 4. POST /fraud/query
+
+**Connection Type:** Automatic Sync (Read)
+
+**When Data is Read:**
+- Automatically syncs with S3 bucket before performing the query
+- Ensures queries include the latest fraud records from all banks
+- Sync happens automatically on each query request
+
+**How Data is Read:**
+1. Before querying, the system syncs with S3 to load latest records
+2. Merges S3 records with in-memory cache (avoids duplicates)
+3. Performs query against the combined dataset
+4. Returns matching fraud records if found
+
+#### 5. GET /fraud/analytics
+
+**Connection Type:** Automatic Sync (Read)
+
+**When Data is Read:**
+- Automatically syncs with S3 bucket before generating analytics
+- Ensures analytics include the latest fraud records from all banks
+- Sync happens automatically on each analytics request
+
+**How Data is Read:**
+1. Before generating analytics, the system syncs with S3 to load latest records
+2. Merges S3 records with in-memory cache
+3. Calculates analytics from the combined dataset
+4. Returns comprehensive fraud statistics
+
+### S3 Bucket Structure
+
+Fraud records are organized in the S3 bucket with the following structure:
+
+```
+fraud-detection-service-data/
+├── fraud-records/
+│   ├── 2025/
+│   │   ├── 01/
+│   │   │   ├── fraud-1736284800000-abc123.json
+│   │   │   ├── fraud-1736284801000-def456.json
+│   │   │   └── fraud-1736284802000-ghi789.json
+│   │   ├── 02/
+│   │   │   └── fraud-1738963200000-jkl012.json
+│   │   └── ...
+│   └── ...
+└── analytics/
+    └── daily/
+        ├── analytics-2025-01-07.json
+        └── analytics-2025-01-08.json
+```
+
+**File Naming Convention:**
+- Fraud records: `fraud-{timestamp}-{randomId}.json`
+- Organized by year and month for efficient querying
+- Each file contains a single fraud record in JSON format
+
+### Data Flow Diagram
+
+```
+┌─────────────────────────┐
+│ POST /behavior/analyze  │
+│ (intentRiskScore >= 0.7)│
+└───────────┬─────────────┘
+            │
+            ▼
+    ┌───────────────┐
+    │ Convert to    │
+    │ FraudRecord   │
+    └───────┬───────┘
+            │
+            ▼
+    ┌───────────────┐      ┌──────────────────┐
+    │  S3Service    │─────▶│   S3 Bucket      │
+    │ uploadRecord  │      │ fraud-records/   │
+    └───────────────┘      │ YYYY/MM/         │
+                           └────────┬─────────┘
+                                    │
+┌─────────────────────────┐         │
+│ POST /transactions/     │         │
+│ predict                 │         │
+│ (HIGH_RISK/SUSPICIOUS)  │         │
+└───────────┬─────────────┘         │
+            │                       │
+            ▼                       │
+    ┌───────────────┐               │
+    │ Convert to    │               │
+    │ FraudRecord   │               │
+    └───────┬───────┘               │
+            │                       │
+            └───────────┬───────────┘
+                        │
+                        ▼
+                ┌───────────────┐
+                │ FraudService  │
+                │ (syncs from   │
+                │  S3 on query) │
+                └───────┬───────┘
+                        │
+        ┌───────────────┼───────────────┐
+        │               │               │
+        ▼               ▼               ▼
+┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+│ POST /fraud/ │ │ POST /fraud/ │ │ GET /fraud/  │
+│ submit       │ │ query        │ │ analytics    │
+└──────────────┘ └──────────────┘ └──────────────┘
+```
+
+### Configuration
+
+The S3 integration requires the following environment variables:
+
+```env
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=your-access-key-id
+AWS_SECRET_ACCESS_KEY=your-secret-access-key
+S3_BUCKET_NAME=fraud-detection-service-data
+BANK_ID=your-bank-id  # Optional, defaults to 'default-bank'
+```
+
+### Key Features
+
+- **Automatic Persistence**: Fraud detected by either module is automatically saved to S3
+- **Cross-Bank Sharing**: All banks can read from the same S3 bucket for shared intelligence
+- **Data Privacy**: Sensitive data is hashed (SHA-256) before storage
+- **Non-Blocking**: S3 uploads don't delay API responses
+- **Automatic Sync**: FraudService automatically syncs with S3 before queries/analytics
+- **Error Handling**: System continues operation even if S3 operations fail
+- **Organized Storage**: Records are organized by date for efficient querying
+
+### Privacy and Security
+
+- **Hashed Identifiers**: All sensitive data (device IDs, account IDs, transaction patterns) are hashed using SHA-256 before storage
+- **No Personal Data**: Only anonymized hashes are stored, never actual customer information
+- **Environment Variables**: AWS credentials are stored in environment variables, not in code
+- **Secure Storage**: S3 bucket should be configured with appropriate access controls and encryption
+
 ## Project Structure
 
 ```
@@ -883,10 +1157,11 @@ cp env.example .env
 
 ## Future Enhancements
 
-- Database integration for persistent fraud data storage
 - Real-time fraud alerts and notifications
 - Machine learning models for fraud pattern detection
 - Advanced analytics and reporting dashboards
+- S3 bucket versioning and lifecycle policies for fraud record retention
+- Enhanced query capabilities with S3 Select for efficient data retrieval
 
 ## License
 
