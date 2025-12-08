@@ -6,22 +6,34 @@ import {
   FraudRecord,
   FraudAnalyticsResponse,
 } from '../../types/fraud';
+import { S3Service } from '../../services/s3Service';
 
 /**
  * Cross-Banking Fraud Sharing Service
  * Allows multiple banks to share anonymized fraud intelligence
  * without exposing personal customer data
+ * Connected to S3 bucket for persistent storage
  */
 export class FraudService {
-  // In-memory storage (in production, this would be a database)
+  // In-memory storage (synced with S3)
   private fraudRecords: FraudRecord[] = [];
+  private s3Service: S3Service;
+  private s3SyncInProgress: boolean = false;
+
+  constructor() {
+    this.s3Service = new S3Service();
+    // Load records from S3 on initialization
+    this.loadFromS3().catch((error) => {
+      console.error('Error loading fraud records from S3 on initialization:', error);
+    });
+  }
 
   /**
    * Submits new fraud data to the database
    */
-  public submitFraud(
+  public async submitFraud(
     request: FraudSubmissionRequest
-  ): FraudSubmissionResponse {
+  ): Promise<FraudSubmissionResponse> {
     try {
       // Validate request
       if (
@@ -55,8 +67,16 @@ export class FraudService {
         submittedAt: new Date().toISOString(),
       };
 
-      // Store fraud record
+      // Store fraud record in memory
       this.fraudRecords.push(fraudRecord);
+
+      // Also save to S3 bucket
+      try {
+        await this.s3Service.uploadFraudRecord(fraudId, fraudRecord);
+      } catch (error) {
+        console.error('Error saving fraud record to S3:', error);
+        // Continue even if S3 save fails
+      }
 
       return {
         success: true,
@@ -75,7 +95,9 @@ export class FraudService {
   /**
    * Checks if device, account, or transaction pattern is associated with fraud
    */
-  public queryFraud(request: FraudQueryRequest): FraudQueryResponse {
+  public async queryFraud(request: FraudQueryRequest): Promise<FraudQueryResponse> {
+    // Sync with S3 before querying to get latest records
+    await this.syncWithS3();
     try {
       const matches = {
         deviceIdHash: false,
@@ -144,7 +166,9 @@ export class FraudService {
   /**
    * Gets fraud analytics
    */
-  public getAnalytics(): FraudAnalyticsResponse {
+  public async getAnalytics(): Promise<FraudAnalyticsResponse> {
+    // Sync with S3 before getting analytics to include latest records
+    await this.syncWithS3();
     try {
       if (this.fraudRecords.length === 0) {
         return {
@@ -214,8 +238,45 @@ export class FraudService {
   /**
    * Get all fraud records (for internal use)
    */
-  public getAllRecords(): FraudRecord[] {
+  public async getAllRecords(): Promise<FraudRecord[]> {
+    // Sync with S3 before returning records
+    await this.syncWithS3();
     return [...this.fraudRecords];
+  }
+
+  /**
+   * Load fraud records from S3 bucket
+   */
+  private async loadFromS3(): Promise<void> {
+    try {
+      const records = await this.s3Service.listFraudRecords(1000); // Load up to 1000 records
+      if (records && records.length > 0) {
+        // Merge with existing records, avoiding duplicates
+        const existingIds = new Set(this.fraudRecords.map(r => r.fraudId));
+        const newRecords = records.filter(r => !existingIds.has(r.fraudId));
+        this.fraudRecords.push(...newRecords);
+        console.log(`Loaded ${newRecords.length} fraud records from S3`);
+      }
+    } catch (error) {
+      console.error('Error loading fraud records from S3:', error);
+    }
+  }
+
+  /**
+   * Sync fraud records with S3 bucket
+   */
+  private async syncWithS3(): Promise<void> {
+    // Prevent concurrent sync operations
+    if (this.s3SyncInProgress) {
+      return;
+    }
+
+    this.s3SyncInProgress = true;
+    try {
+      await this.loadFromS3();
+    } finally {
+      this.s3SyncInProgress = false;
+    }
   }
 }
 

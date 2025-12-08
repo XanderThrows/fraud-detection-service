@@ -12,7 +12,7 @@ const fraudService = new FraudService();
  * POST /fraud/submit
  * Submits new fraud data to the database
  */
-router.post('/submit', (req: Request, res: Response) => {
+router.post('/submit', async (req: Request, res: Response) => {
   try {
     const request: FraudSubmissionRequest = req.body;
 
@@ -51,7 +51,7 @@ router.post('/submit', (req: Request, res: Response) => {
     }
 
     // Submit fraud data
-    const result = fraudService.submitFraud(request);
+    const result = await fraudService.submitFraud(request);
 
     if (result.success) {
       res.status(201).json(result);
@@ -71,7 +71,7 @@ router.post('/submit', (req: Request, res: Response) => {
  * POST /fraud/query
  * Checks if device, account, or transaction pattern is associated with fraud
  */
-router.post('/query', (req: Request, res: Response) => {
+router.post('/query', async (req: Request, res: Response) => {
   try {
     const request: FraudQueryRequest = req.body;
 
@@ -87,7 +87,7 @@ router.post('/query', (req: Request, res: Response) => {
     }
 
     // Query fraud data
-    const result = fraudService.queryFraud(request);
+    const result = await fraudService.queryFraud(request);
 
     res.status(200).json(result);
   } catch (error) {
@@ -102,9 +102,9 @@ router.post('/query', (req: Request, res: Response) => {
  * GET /fraud/analytics
  * Returns fraud analytics and statistics
  */
-router.get('/analytics', (req: Request, res: Response) => {
+router.get('/analytics', async (req: Request, res: Response) => {
   try {
-    const analytics = fraudService.getAnalytics();
+    const analytics = await fraudService.getAnalytics();
     res.status(200).json(analytics);
   } catch (error) {
     console.error('Error getting fraud analytics:', error);

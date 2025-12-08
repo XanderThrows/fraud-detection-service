@@ -759,7 +759,7 @@ fraud-detection-service/
 │   └── index.ts
 ├── __tests__/
 │   └── s3-connection.test.ts
-├── dist/                 # Compiled JavaScript (generated)
+├── dist/                 
 ├── package.json
 ├── tsconfig.json
 ├── jest.config.js
