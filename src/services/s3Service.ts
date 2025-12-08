@@ -13,10 +13,16 @@ export class S3Service {
     
     this.s3Client = new S3Client({
       region: process.env.AWS_REGION || 'us-east-1',
-      credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-      },
+      const credentials = process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY
+      ? {
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+        }
+      : undefined;
+    
+    this.s3Client = new S3Client({
+      region: process.env.AWS_REGION || 'us-east-1',
+      ...(credentials && { credentials }),
     });
   }
 
@@ -251,6 +257,7 @@ export class S3Service {
     }
   }
 }
+
 
 
 
