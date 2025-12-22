@@ -43,6 +43,44 @@ npm run dev
 
 The service will start on `http://localhost:3000` by default.
 
+## API Documentation (Swagger)
+
+The service includes comprehensive Swagger/OpenAPI documentation that provides interactive API exploration and testing capabilities.
+
+### Accessing Swagger UI
+
+Once the server is running, access the Swagger documentation at:
+
+```
+http://localhost:3000/api-docs
+```
+
+### Features
+
+- **Interactive API Explorer**: Test all endpoints directly from the browser
+- **Request/Response Schemas**: View detailed schemas for all request and response bodies
+- **Try It Out**: Execute API calls with sample data
+- **Complete Documentation**: All endpoints, parameters, and responses are documented
+
+### API Endpoints Documented
+
+The Swagger documentation includes:
+
+- **Health Endpoints**: Service health checks
+- **Behavior Analysis**: Human-intent detection endpoints
+- **Transaction Prediction**: Predictive scam prevention endpoints
+- **Fraud Sharing**: Cross-banking fraud sharing endpoints
+
+### Swagger Specification
+
+The Swagger specification follows OpenAPI 3.0.0 standard and includes:
+
+- Complete request/response schemas
+- Parameter validation rules
+- Error response documentation
+- Example values for all fields
+- Tag-based organization
+
 ## Health
 
 The service provides health check endpoints to monitor service status and availability.

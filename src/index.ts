@@ -1,6 +1,8 @@
 import express, { Express } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import swaggerUi from 'swagger-ui-express';
+import { swaggerSpec } from './config/swagger';
 import behaviorRoutes from './routes/behavior.routes';
 import transactionRoutes from './routes/transaction.routes';
 import fraudRoutes from './routes/fraud.routes';
@@ -15,6 +17,12 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Swagger documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'Fraud Detection Service API Documentation',
+}));
 
 // Root endpoint - API documentation
 app.get('/getAll', (req, res) => {
@@ -166,7 +174,8 @@ app.use((req, res) => {
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 Fraud Detection Service running on port ${PORT}`);
-  console.log(`📋 API documentation: http://localhost:${PORT}/getAll`);
+  console.log(`📚 Swagger API documentation: http://localhost:${PORT}/api-docs`);
+  console.log(`📋 API endpoints list: http://localhost:${PORT}/getAll`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`🔍 Behavior analysis: http://localhost:${PORT}/behavior/analyze`);
   console.log(`💰 Transaction prediction: http://localhost:${PORT}/transactions/predict`);
