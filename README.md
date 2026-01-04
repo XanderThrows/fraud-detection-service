@@ -43,44 +43,6 @@ npm run dev
 
 The service will start on `http://localhost:3000` by default.
 
-## API Documentation (Swagger)
-
-The service includes comprehensive Swagger/OpenAPI documentation that provides interactive API exploration and testing capabilities.
-
-### Accessing Swagger UI
-
-Once the server is running, access the Swagger documentation at:
-
-```
-http://localhost:3000/api-docs
-```
-
-### Features
-
-- **Interactive API Explorer**: Test all endpoints directly from the browser
-- **Request/Response Schemas**: View detailed schemas for all request and response bodies
-- **Try It Out**: Execute API calls with sample data
-- **Complete Documentation**: All endpoints, parameters, and responses are documented
-
-### API Endpoints Documented
-
-The Swagger documentation includes:
-
-- **Health Endpoints**: Service health checks
-- **Behavior Analysis**: Human-intent detection endpoints
-- **Transaction Prediction**: Predictive scam prevention endpoints
-- **Fraud Sharing**: Cross-banking fraud sharing endpoints
-
-### Swagger Specification
-
-The Swagger specification follows OpenAPI 3.0.0 standard and includes:
-
-- Complete request/response schemas
-- Parameter validation rules
-- Error response documentation
-- Example values for all fields
-- Tag-based organization
-
 ## Health
 
 The service provides health check endpoints to monitor service status and availability.
@@ -601,6 +563,28 @@ The system determines the recommended action based on risk score and reason code
 - **APPROVE** (Risk < 0.4):
   - Low risk transactions
   - Normal transaction patterns
+
+#### Use Cases
+
+1. **Large Transaction Detection:** Prevent fraud by detecting transactions that are significantly larger than a user's typical transaction size. For example, a user who normally makes $200 transactions attempting a $5,000 wire transfer would trigger a high-risk alert.
+
+2. **High-Risk Transaction Type Prevention:** Identify and flag inherently risky transaction types such as wire transfers, international transfers, cryptocurrency transactions, money orders, and cash advances before they are processed.
+
+3. **Geographic Risk Assessment:** Detect transactions to high-risk locations such as offshore accounts, tax havens, or sanctioned countries. This helps prevent money laundering and fraud schemes involving international transfers.
+
+4. **New Device Fraud Prevention:** Identify and require additional verification for transactions initiated from devices that haven't been used by the account holder before. This helps prevent account takeover attempts and unauthorized access.
+
+5. **Unusual Timing Detection:** Flag transactions that occur at unusual hours (e.g., 2 AM - 6 AM UTC) or outside the user's typical transaction patterns. Scammers often operate during off-hours to avoid detection.
+
+6. **New Recipient Verification:** Detect transactions to recipients the user has never sent money to before. Require additional verification for first-time recipients to prevent scams where users are tricked into sending money to fraudulent accounts.
+
+7. **Combined Risk Factor Analysis:** Detect sophisticated fraud attempts by analyzing multiple risk factors simultaneously. For example, a large wire transfer to a new recipient in an offshore location from a new device at 3 AM would trigger the highest risk alerts.
+
+8. **Proactive Scam Prevention:** Prevent fraud before it happens by analyzing transactions in real-time before processing. Unlike reactive systems that detect fraud after the fact, this system can block or delay suspicious transactions.
+
+9. **Social Engineering Defense:** Protect users from social engineering attacks where scammers manipulate victims into making large transfers. The system can detect unusual patterns and require additional verification or block the transaction entirely.
+
+10. **Account Takeover Prevention:** Identify and prevent unauthorized account access by detecting transactions from unknown devices combined with unusual transaction patterns, amounts, or recipients.
 
 #### Integration Recommendations
 
